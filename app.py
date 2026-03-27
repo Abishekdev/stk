@@ -5,8 +5,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
-import tensorflow as tf
-from tensorflow.keras import layers, models
+from sklearn.neural_network import MLPRegressor
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -42,15 +41,14 @@ def create_sequences(values, sequence_length):
 
 
 def build_model(sequence_length):
-    """Build a simple LSTM model."""
-    model = models.Sequential(
-        [
-            layers.Input(shape=(sequence_length, 1)),
-            layers.LSTM(50),
-            layers.Dense(1),
-        ]
+    """Build a neural network model using scikit-learn."""
+    model = MLPRegressor(
+        hidden_layer_sizes=(100, 50),
+        max_iter=500,
+        random_state=42,
+        early_stopping=True,
+        validation_fraction=0.1
     )
-    model.compile(optimizer="adam", loss="mse")
     return model
 
 
@@ -68,17 +66,14 @@ def train_model_cached(ticker, start_date, end_date, epochs):
     x_train, x_test = x_all[:split_index], x_all[split_index:]
     y_train, y_test = y_all[:split_index], y_all[split_index:]
 
-    model = build_model(SEQUENCE_LENGTH)
-    model.fit(
-        x_train,
-        y_train,
-        epochs=epochs,
-        batch_size=BATCH_SIZE,
-        validation_data=(x_test, y_test),
-        verbose=0,
-    )
+    # Reshape for scikit-learn (flatten sequences)
+    x_train_flat = x_train.reshape(x_train.shape[0], -1)
+    x_test_flat = x_test.reshape(x_test.shape[0], -1)
 
-    return model, scaler, scaled_values, x_test, y_test
+    model = build_model(SEQUENCE_LENGTH)
+    model.fit(x_train_flat, y_train.ravel())
+
+    return model, scaler, scaled_values, x_test_flat, y_test
 
 
 def run_prediction(ticker, start_date, end_date=None, epochs=EPOCHS):
